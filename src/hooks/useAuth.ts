@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -45,6 +45,7 @@ export function useAuth() {
   const wallet = useTonWallet()
   const queryClient = useQueryClient()
   const verifying = useRef(false)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: fetchMe })
 
@@ -84,6 +85,7 @@ export function useAuth() {
     if (meQuery.data) return // already authenticated
 
     verifying.current = true
+    setAuthError(null)
     void (async () => {
       try {
         const res = await fetch('/api/auth/verify', {
@@ -106,7 +108,10 @@ export function useAuth() {
         if (res.ok) {
           await queryClient.invalidateQueries({ queryKey: ['me'] })
         } else {
-          // Proof rejected — drop the wallet connection to avoid a broken state.
+          // Surface WHY the proof was rejected (wrong_network, proof_invalid…)
+          // so the UI can explain instead of silently dropping the wallet.
+          const data = await res.json().catch(() => null)
+          setAuthError(data?.error?.code ?? 'proof_invalid')
           await tonConnectUI.disconnect().catch(() => {})
         }
       } catch {
@@ -133,6 +138,7 @@ export function useAuth() {
     isLoading: meQuery.isLoading,
     isAuthenticated: !!meQuery.data,
     walletConnected: !!wallet,
+    authError,
     connect: () => tonConnectUI.openModal(),
     logout,
   }

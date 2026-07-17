@@ -49,7 +49,9 @@
   "auth": {
     "connectTitle": "Sign in with TON",
     "connectHint": "Connect your wallet to play",
-    "verifying": "Verifying signature…"
+    "verifying": "Verifying signature…",
+    "wrongNetwork": "Your wallet is on the wrong network. Switch network in your wallet (Tonkeeper: Settings → enable “Testnet”) and try again.",
+    "proofFailed": "Wallet verification failed. Please try connecting again."
   },
   "settings": {
     "title": "Settings",

@@ -12,10 +12,11 @@ import {
   Ban,
   CheckCircle2,
   XCircle,
+  Coins,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatTon } from '@/shared/ton-format'
+import { formatTon, parseTon } from '@/shared/ton-format'
 import { cn } from '@/lib/utils'
 
 type Tab = 'analytics' | 'users' | 'withdrawals' | 'games' | 'config' | 'audit'
@@ -108,6 +109,10 @@ function Analytics() {
 function UsersTab() {
   const queryClient = useQueryClient()
   const [q, setQ] = useState('')
+  // userId of the row whose "give balance" form is open, and the draft amount in TON
+  const [grantFor, setGrantFor] = useState<string | null>(null)
+  const [grantAmount, setGrantAmount] = useState('')
+  const [grantError, setGrantError] = useState<string | null>(null)
   const { data } = useQuery({
     queryKey: ['admin-users', q],
     queryFn: () =>
@@ -124,14 +129,38 @@ function UsersTab() {
       }>(`/api/admin/users?q=${encodeURIComponent(q)}`),
   })
   const patch = useMutation({
-    mutationFn: (body: { userId: string; action: string }) =>
+    mutationFn: (body: { userId: string; action: string; amount?: string }) =>
       api('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => {
+      setGrantFor(null)
+      setGrantAmount('')
+      setGrantError(null)
+      void queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+    onError: (e) => setGrantError((e as Error).message),
   })
+
+  function submitGrant(userId: string) {
+    let nano: bigint
+    try {
+      // Leading "-" = списание (забрать баланс), остальное — начисление.
+      const negative = grantAmount.trim().startsWith('-')
+      nano = parseTon(grantAmount.trim().replace(/^-/, ''))
+      if (negative) nano = -nano
+    } catch {
+      setGrantError('Неверная сумма. Пример: 10 или 1.5 (или -5, чтобы списать)')
+      return
+    }
+    if (nano === 0n) {
+      setGrantError('Сумма не может быть нулевой')
+      return
+    }
+    patch.mutate({ userId, action: 'adjust_balance', amount: nano.toString() })
+  }
 
   return (
     <div className="space-y-4">
@@ -143,32 +172,67 @@ function UsersTab() {
       />
       <div className="space-y-2">
         {data?.users.map((u) => (
-          <Card key={u.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 font-semibold">
-                {u.nickname}
-                {u.isBlocked && (
-                  <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
-                    BLOCKED
-                  </span>
-                )}
+          <Card key={u.id} className="px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-semibold">
+                  {u.nickname}
+                  {u.isBlocked && (
+                    <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                      BLOCKED
+                    </span>
+                  )}
+                </div>
+                <div className="truncate font-mono text-xs text-muted-foreground">{u.tonAddress}</div>
               </div>
-              <div className="truncate font-mono text-xs text-muted-foreground">{u.tonAddress}</div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right text-sm">
-                <div className="font-bold">{formatTon(u.balance)} TON</div>
-                <div className="text-xs text-muted-foreground">{u.gamesPlayed} игр</div>
+              <div className="flex items-center gap-3">
+                <div className="text-right text-sm">
+                  <div className="font-bold">{formatTon(u.balance)} TON</div>
+                  <div className="text-xs text-muted-foreground">{u.gamesPlayed} игр</div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setGrantFor(grantFor === u.id ? null : u.id)
+                    setGrantAmount('')
+                    setGrantError(null)
+                  }}
+                >
+                  <Coins className="h-3.5 w-3.5" />
+                  Баланс
+                </Button>
+                <Button
+                  size="sm"
+                  variant={u.isBlocked ? 'success' : 'destructive'}
+                  onClick={() => patch.mutate({ userId: u.id, action: u.isBlocked ? 'unblock' : 'block' })}
+                >
+                  <Ban className="h-3.5 w-3.5" />
+                  {u.isBlocked ? 'Разблок.' : 'Блок.'}
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant={u.isBlocked ? 'success' : 'destructive'}
-                onClick={() => patch.mutate({ userId: u.id, action: u.isBlocked ? 'unblock' : 'block' })}
-              >
-                <Ban className="h-3.5 w-3.5" />
-                {u.isBlocked ? 'Разблок.' : 'Блок.'}
-              </Button>
             </div>
+            {grantFor === u.id && (
+              <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
+                <div className="flex gap-2">
+                  <input
+                    value={grantAmount}
+                    onChange={(e) => setGrantAmount(e.target.value)}
+                    placeholder="Сумма в TON, напр. 10 или -5"
+                    autoFocus
+                    className="glass flex-1 px-3 py-2 text-sm outline-none focus:border-primary/50"
+                    onKeyDown={(e) => e.key === 'Enter' && submitGrant(u.id)}
+                  />
+                  <Button size="sm" disabled={patch.isPending} onClick={() => submitGrant(u.id)}>
+                    Начислить
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Положительная сумма — начислить, с минусом — списать. Операция попадёт в аудит-лог.
+                </p>
+                {grantError && <p className="text-xs text-destructive">{grantError}</p>}
+              </div>
+            )}
           </Card>
         ))}
       </div>

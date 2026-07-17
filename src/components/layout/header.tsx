@@ -21,10 +21,15 @@ const NAV_ITEMS = [
 export function Header() {
   const t = useTranslations()
   const pathname = usePathname()
-  const { user, isAuthenticated, connect, logout } = useAuth()
+  const { user, isAuthenticated, connect, logout, authError } = useAuth()
 
   return (
     <>
+      {authError && (
+        <div className="bg-destructive/90 px-4 py-2 text-center text-sm font-medium text-white">
+          {authError === 'wrong_network' ? t('auth.wrongNetwork') : t('auth.proofFailed')}
+        </div>
+      )}
       <header className="sticky top-0 z-40 border-b border-white/5 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">

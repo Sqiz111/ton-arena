@@ -35,18 +35,25 @@ async function main() {
     await prisma.achievement.upsert({ where: { code }, update: {}, create: { code } })
   }
 
-  // Default admin (change the password immediately in production)
-  const adminEmail = 'admin@tonarena.local'
-  const existing = await prisma.adminUser.findUnique({ where: { email: adminEmail } })
-  if (!existing) {
-    await prisma.adminUser.create({
-      data: {
-        email: adminEmail,
-        passwordHash: await argon2.hash('admin12345'),
-        role: 'SUPERADMIN',
-      },
-    })
-    console.log(`Seeded admin: ${adminEmail} / admin12345`)
+  // Default admin. Credentials come from env in production; the dev fallback
+  // (admin@tonarena.local / admin12345) is refused when NODE_ENV=production.
+  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@tonarena.local'
+  const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin12345'
+  const isProd = process.env.NODE_ENV === 'production'
+  if (isProd && !process.env.ADMIN_PASSWORD) {
+    console.warn('ADMIN_PASSWORD not set — skipping admin seeding in production')
+  } else {
+    const existing = await prisma.adminUser.findUnique({ where: { email: adminEmail } })
+    if (!existing) {
+      await prisma.adminUser.create({
+        data: {
+          email: adminEmail,
+          passwordHash: await argon2.hash(adminPassword),
+          role: 'SUPERADMIN',
+        },
+      })
+      console.log(`Seeded admin: ${adminEmail}`)
+    }
   }
 
   console.log('Seed complete')

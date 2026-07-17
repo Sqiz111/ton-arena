@@ -32,6 +32,14 @@ export const POST = withErrors(async (req: NextRequest) => {
   const body = await parseBody(req, bodySchema)
 
   const env = getEnv()
+
+  // Distinguish "wrong network" from other proof failures so the client can
+  // tell the user to switch their wallet network instead of a generic error.
+  const expectedChain = env.TON_NETWORK === 'mainnet' ? '-239' : '-3'
+  if (body.network !== expectedChain) {
+    return jsonError(401, 'wrong_network', `Expected ${env.TON_NETWORK} wallet`)
+  }
+
   const expectedDomain = new URL(env.NEXT_PUBLIC_APP_URL).host
   const user = await AuthService.verifyAndLogin(body, expectedDomain, env.TON_NETWORK)
   if (!user) return jsonError(401, 'proof_invalid', 'TON proof verification failed')

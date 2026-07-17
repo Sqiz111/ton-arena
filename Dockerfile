@@ -36,5 +36,6 @@ COPY --from=build /app/src ./src
 
 USER app
 EXPOSE 3000
-# Apply migrations then boot the custom server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server/index.js"]
+# Apply migrations, seed idempotent baseline data (config/achievements/admin),
+# then boot the custom server. A seed hiccup must not block boot.
+CMD ["sh", "-c", "npx prisma migrate deploy && (npx tsx prisma/seed.ts || echo 'seed failed, continuing') && node dist/server/index.js"]

@@ -1,0 +1,324 @@
+// TON Arena — Prisma schema
+// Money: BigInt nanotons everywhere (1 TON = 1e9 nanoton).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── enums ─────────────────────────
+
+enum LedgerType {
+  DEPOSIT
+  WITHDRAWAL
+  WITHDRAWAL_REFUND
+  BET
+  WIN
+  REFUND
+  FEE
+  ADMIN_ADJUST
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVAL_REQUIRED
+  PROCESSING
+  SENT
+  CONFIRMED
+  FAILED
+  REJECTED
+}
+
+enum GameType {
+  WHEEL
+  BATTLESHIP
+  TICTACTOE
+  MINES
+  PLINKO
+}
+
+enum RoundStatus {
+  WAITING
+  BETTING
+  SPINNING
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchStatus {
+  MATCHMAKING
+  PLACING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SoloStatus {
+  ACTIVE
+  CASHED_OUT
+  BUSTED
+  COMPLETED
+}
+
+enum AdminRole {
+  SUPERADMIN
+  MODERATOR
+}
+
+enum WheelRoomTier {
+  LOW
+  MID
+  HIGH
+}
+
+// ───────────────────────── users & auth ─────────────────────────
+
+model User {
+  id          String   @id @default(cuid())
+  tonAddress  String   @unique // raw form "0:<hex>", normalized on write
+  nickname    String   @unique
+  avatarUrl   String?
+  depositMemo String   @unique // e.g. "TA-9F3K2X" — deposit comment
+  balance     BigInt   @default(0) // cached; source of truth is the ledger
+  xp          Int      @default(0)
+  level       Int      @default(1)
+  isBlocked   Boolean  @default(false)
+  clientSeed  String // current client seed for solo provably-fair games
+  soloNonce   Int      @default(0) // increments per solo bet
+  locale      String   @default("ru")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ledger       LedgerEntry[]
+  deposits     Deposit[]
+  withdrawals  Withdrawal[]
+  wheelBets    WheelBet[]
+  soloGames    SoloGame[]
+  achievements UserAchievement[]
+  stats        UserStats?
+}
+
+model UserStats {
+  userId       String @id
+  user         User   @relation(fields: [userId], references: [id])
+  gamesPlayed  Int    @default(0)
+  gamesWon     Int    @default(0)
+  totalWagered BigInt @default(0)
+  totalWon     BigInt @default(0)
+  totalLost    BigInt @default(0)
+  biggestWin   BigInt @default(0)
+}
+
+model AuthNonce {
+  id        String    @id @default(cuid())
+  payload   String    @unique // random hex embedded into ton_proof payload
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String // argon2id
+  role         AdminRole @default(MODERATOR)
+  createdAt    DateTime  @default(now())
+}
+
+// ───────────────────────── ledger (append-only) ─────────────────────────
+
+model LedgerEntry {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  type         LedgerType
+  amount       BigInt // signed: credits > 0, debits < 0
+  balanceAfter BigInt
+  refType      String? // "deposit" | "withdrawal" | "wheel_round" | "match" | "solo_game"
+  refId        String?
+  createdAt    DateTime   @default(now())
+
+  @@index([userId, createdAt])
+  @@index([refType, refId])
+}
+
+// ───────────────────────── deposits / withdrawals ─────────────────────────
+
+model Deposit {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      BigInt
+  txHash      String
+  lt          BigInt // logical time on the hot-wallet account
+  fromAddress String
+  comment     String
+  createdAt   DateTime @default(now())
+
+  @@unique([txHash, lt]) // idempotency anchor for the watcher
+  @@index([userId, createdAt])
+}
+
+model Withdrawal {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  amount      BigInt // debited from balance at request time
+  toAddress   String
+  status      WithdrawalStatus @default(PENDING)
+  txHash      String?
+  seqno       Int? // hot-wallet seqno used for the transfer
+  failReason  String?
+  createdAt   DateTime         @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ───────────────────────── wheel ─────────────────────────
+
+model WheelRound {
+  id             String        @id @default(cuid())
+  tier           WheelRoomTier
+  roundNumber    Int // per-tier sequence
+  status         RoundStatus   @default(WAITING)
+  serverSeed     String? // revealed after completion
+  serverSeedHash String // published at creation
+  betsHash       String? // sha256 of the ordered bet list, set at lock
+  winningTicket  BigInt?
+  winnerUserId   String?
+  potAmount      BigInt        @default(0)
+  feeAmount      BigInt        @default(0)
+  bettingEndsAt  DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  bets           WheelBet[]
+
+  @@unique([tier, roundNumber])
+  @@index([status])
+}
+
+model WheelBet {
+  id         String     @id @default(cuid())
+  roundId    String
+  round      WheelRound @relation(fields: [roundId], references: [id])
+  userId     String
+  user       User       @relation(fields: [userId], references: [id])
+  amount     BigInt
+  ticketFrom BigInt // inclusive; 1 ticket = 1 nanoton
+  ticketTo   BigInt // inclusive
+  createdAt  DateTime   @default(now())
+
+  @@index([roundId])
+  @@index([userId, createdAt])
+}
+
+// ───────────────────────── PvP matches ─────────────────────────
+
+model Match {
+  id            String      @id @default(cuid())
+  gameType      GameType // BATTLESHIP | TICTACTOE
+  status        MatchStatus @default(MATCHMAKING)
+  betAmount     BigInt
+  potAmount     BigInt
+  feeAmount     BigInt      @default(0)
+  player1Id     String
+  player2Id     String?
+  winnerUserId  String? // null + COMPLETED = draw (refund)
+  serverSeed    String // first-turn fairness
+  stateSnapshot Json? // engine state for resync/recovery
+  createdAt     DateTime    @default(now())
+  completedAt   DateTime?
+  moves         MatchMove[]
+
+  @@index([status, gameType])
+  @@index([player1Id])
+  @@index([player2Id])
+}
+
+model MatchMove {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id])
+  userId    String
+  moveIndex Int
+  payload   Json // {x,y} | {cell} | {ships:[…]}
+  result    Json? // {hit,sunk} etc.
+  createdAt DateTime @default(now())
+
+  @@unique([matchId, moveIndex])
+}
+
+// ───────────────────────── solo games ─────────────────────────
+
+model SoloGame {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  gameType       GameType // MINES | PLINKO
+  status         SoloStatus
+  betAmount      BigInt
+  payoutAmount   BigInt     @default(0)
+  serverSeed     String // revealed on finish
+  serverSeedHash String // shown before start
+  clientSeed     String
+  nonce          Int
+  config         Json // {mines,gridSize} | {risk,rows}
+  state          Json // revealed cells / path result
+  createdAt      DateTime   @default(now())
+  finishedAt     DateTime?
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
+// ───────────────────────── achievements / config / audit / analytics ─────────────────────────
+
+model Achievement {
+  code  String            @id // "FIRST_WIN", "HIGH_ROLLER", …
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  userId      String
+  code        String
+  achievement Achievement @relation(fields: [code], references: [code])
+  user        User        @relation(fields: [userId], references: [id])
+  unlockedAt  DateTime    @default(now())
+
+  @@id([userId, code])
+}
+
+model PlatformConfig {
+  key       String   @id // "platform_fee_bps", "wheel_max_bet_LOW", …
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorType String // "user" | "admin" | "system"
+  actorId   String?
+  action    String // "withdrawal.approve", "user.block", …
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([actorType, actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+model DailyStats {
+  date          DateTime @id @db.Date
+  dau           Int      @default(0)
+  wagered       BigInt   @default(0)
+  depositTotal  BigInt   @default(0)
+  withdrawTotal BigInt   @default(0)
+  feeRevenue    BigInt   @default(0)
+  gamesByType   Json     @default("{}")
+}

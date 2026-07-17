@@ -1,0 +1,78 @@
+{
+  "nav": {
+    "home": "Home",
+    "online": "Online games",
+    "solo": "Solo games",
+    "profile": "Profile",
+    "settings": "Settings",
+    "wallet": "Wallet",
+    "fair": "Provably fair"
+  },
+  "common": {
+    "connect": "Connect wallet",
+    "disconnect": "Disconnect",
+    "balance": "Balance",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "play": "Play",
+    "bet": "Bet",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "error": "Error",
+    "copied": "Copied",
+    "ton": "TON"
+  },
+  "home": {
+    "title": "Play and win in TON",
+    "subtitle": "PvP wheel, battleship, Mines and Plinko. Fair games with verifiable outcomes.",
+    "recentWins": "Recent wins",
+    "popularGames": "Popular games",
+    "liveGames": "Live now",
+    "playNow": "Play now",
+    "won": "won"
+  },
+  "games": {
+    "wheel": "Wheel",
+    "wheelDesc": "PvP wheel: the bigger your bet, the higher your chance to take the pot",
+    "battleship": "Battleship",
+    "battleshipDesc": "Classic PvP for a stake — sink your opponent's fleet",
+    "tictactoe": "Tic-tac-toe",
+    "tictactoeDesc": "Quick PvP match, winner takes the pot",
+    "mines": "Mines",
+    "minesDesc": "Reveal tiles, dodge the mines and cash out in time",
+    "plinko": "Plinko",
+    "plinkoDesc": "Drop the ball and watch which multiplier it lands on",
+    "online": "PvP games with stakes against real players",
+    "solo": "Games against the house with provable fairness"
+  },
+  "auth": {
+    "connectTitle": "Sign in with TON",
+    "connectHint": "Connect your wallet to play",
+    "verifying": "Verifying signature…"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "language": "Language",
+    "notifications": "Notifications",
+    "security": "Security",
+    "account": "Account"
+  },
+  "profile": {
+    "title": "Profile",
+    "level": "Level",
+    "gamesPlayed": "Games played",
+    "winRate": "Win rate",
+    "totalWon": "Total won",
+    "totalLost": "Total lost",
+    "biggestWin": "Biggest win",
+    "registered": "Registered",
+    "achievements": "Achievements",
+    "history": "Game history",
+    "deposits": "Deposits",
+    "withdrawals": "Withdrawals"
+  }
+}

@@ -92,6 +92,18 @@
     font-feature-settings:
       'ss01' on,
       'cv11' on;
+    /* Mobile: no rubber-band scroll behind the app shell, no dbl-tap zoom delay */
+    overscroll-behavior-y: none;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+  }
+  /* iOS zooms the whole page when focusing an input with font-size < 16px */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 }
 

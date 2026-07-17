@@ -20,6 +20,8 @@ export const viewport: Viewport = {
   themeColor: '#0F172A',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1, // prevents accidental pinch-zoom breaking the game UI in mini-app webviews
+  viewportFit: 'cover', // enables env(safe-area-inset-*) inside Telegram/iOS webviews
 }
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

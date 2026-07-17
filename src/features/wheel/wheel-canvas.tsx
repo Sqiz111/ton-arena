@@ -113,7 +113,7 @@ export function WheelCanvas({
   }, [spin])
 
   return (
-    <div className="relative mx-auto" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative mx-auto aspect-square w-full max-w-[340px]">
       {/* Pointer */}
       <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1">
         <div className="h-0 w-0 border-x-[10px] border-t-[16px] border-x-transparent border-t-warning drop-shadow-lg" />

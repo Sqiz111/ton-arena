@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { motion } from 'framer-motion'
-import { Wallet, User, Settings, Gamepad2, Home, Dice5 } from 'lucide-react'
+import { Wallet, User, Settings, Gamepad2, Home, Dice5, LogOut } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { formatTon } from '@/shared/ton-format'
@@ -65,32 +65,39 @@ export function Header() {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {isAuthenticated && user ? (
               <>
                 <Link
                   href="/wallet"
                   className="glass flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-semibold transition hover:border-primary/40"
                 >
-                  <Wallet className="h-4 w-4 text-primary" />
-                  <span>{formatTon(user.balance)} TON</span>
+                  <Wallet className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="max-w-[30vw] truncate tabular-nums">
+                    {formatTon(user.balance)} TON
+                  </span>
                 </Link>
+                {/* Icon-only logout on phones, text on wider screens */}
                 <Button variant="ghost" size="sm" onClick={() => void logout()}>
-                  {t('common.disconnect')}
+                  <LogOut className="h-4 w-4 sm:hidden" />
+                  <span className="hidden sm:inline">{t('common.disconnect')}</span>
                 </Button>
               </>
             ) : (
-              <Button onClick={connect} size="default">
+              <Button onClick={connect} size="sm" className="sm:h-10 sm:px-5 sm:text-sm">
                 <Wallet className="h-4 w-4" />
-                {t('common.connect')}
+                <span className="whitespace-nowrap">{t('common.connect')}</span>
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Mobile bottom navigation */}
-      <nav className="glass-strong fixed inset-x-3 bottom-3 z-40 flex items-center justify-around py-2 md:hidden">
+      {/* Mobile bottom navigation (safe-area aware for iOS / Telegram Mini App) */}
+      <nav
+        className="glass-strong fixed inset-x-3 bottom-3 z-40 flex items-center justify-around py-2 md:hidden"
+        style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+      >
         {NAV_ITEMS.map(({ href, key, icon: Icon }) => {
           const active = pathname === href
           return (

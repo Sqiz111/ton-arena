@@ -1,7 +1,7 @@
 {
-  "url": "http://localhost:3000",
+  "url": "https://ton-arena.onrender.com",
   "name": "TON Arena",
-  "iconUrl": "http://localhost:3000/icon-192.png",
-  "termsOfUseUrl": "http://localhost:3000/terms",
-  "privacyPolicyUrl": "http://localhost:3000/privacy"
+  "iconUrl": "https://ton-arena.onrender.com/icon-192.png",
+  "termsOfUseUrl": "https://ton-arena.onrender.com/terms",
+  "privacyPolicyUrl": "https://ton-arena.onrender.com/privacy"
 }
